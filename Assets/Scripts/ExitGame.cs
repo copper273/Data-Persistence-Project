@@ -1,22 +1,20 @@
-using UnityEditor;
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using TMPro;
+
 
 public class ExitGame : MonoBehaviour
 {
 
-    public void Exit()
+        public void StartNew()
     {
-#if UNITY_EDITOR
-        EditorApplication.ExitPlaymode();
-#else
-        Application.Quit();
-#endif
-    }
-
-
-
-    public void SaveBest()
-    {
-        MainManager2.Instance.SaveNameAndScore();
+        SceneManager.LoadScene(0);
     }
 }
+
+   
+

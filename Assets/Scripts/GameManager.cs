@@ -1,98 +1,131 @@
-// This script is where all the score stuff is done
-
 using UnityEngine;
 using TMPro;
+using System.IO;
+using System.Collections;
+using System.Collections.Generic;
 
+[DefaultExecutionOrder(1000)]
 public class GameManager : MonoBehaviour
 {
-    public int score;
-    public int highScore;
-    public bool gameOver;
-    public string highScoreName;
+    public static GameManager Instance;
 
+    // Keep these static if you want global access, but it's optional.
+    public static string[] scoreTable = new string[10];
+    public static string userName;
 
-    // Remember to drag the Score text gameObject into the Inpector of the empty GameObject connected to this script
-    public TextMeshProUGUI scoreText;
-    public TextMeshProUGUI highScoreText;
-
-
-    void Start()
+    private void Awake()
     {
-        gameOver = false;
-
-        // Displays the High Score Name and the High Score
-        highScoreText.text = "Best score: " + MainManager2.Instance.playerHighScoreName + ": " + MainManager2.Instance.playerHighScore;
-
-        // If no-one's got a high score yet, display "nobody" as the name
-        if(MainManager2.Instance.playerHighScoreName == "")
-        {
-            MainManager2.Instance.playerHighScoreName = "nobody";
-        }
-
+        if (Instance != null) { Destroy(gameObject); return; }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+        LoadGame();
+        EnsureTable();
     }
 
-
-    void Update()
+    public void SetUserName(string name)
     {
-        if(Input.GetKeyUp(KeyCode.Mouse0)) // when the left mouse button is clicked, add 1 to the current score
-        {
-            gameOver = false;
-            UpdateScore(1);
-        }
-        else if (Input.GetKeyUp(KeyCode.Mouse1)) // if right mouse button is clicked...
-        {
-            SetHighScore(); // Set the high score
-
-            gameOver = true;
-
-            ResetScore(); // Set the current score back to 0
-        }
+    userName = string.IsNullOrWhiteSpace(name) ? "Player" : name;
+    SaveGame(); // persist immediately
     }
 
+    private void EnsureTable()
+    {
+    if (scoreTable == null || scoreTable.Length != 10)
+        scoreTable = new string[10];
+
+    for (int k = 0; k < scoreTable.Length; k++)
+        scoreTable[k] ??= ""; // replace null with empty string
+    }
+
+    /// <summary>
+    /// Call this to insert a new score and save.
+    /// </summary>
+    public void SubmitScore(int currentScore)
+    {
+        UpdateScore(currentScore);
+        SaveGame();
+    }
 
     // ------------  SCORE EDITING  ------------
-    private void UpdateScore(int scoreToAdd)
+    public void UpdateScore(int currentScore)
     {
-        if(gameOver == false)
+        int i = 1; // even index = name, odd index = score
+        int oldScore;
+        string currentUser = userName;
+        string oldUser;
+
+        // Ensure table is initialized
+        if (scoreTable == null || scoreTable.Length != 10)
+            scoreTable = new string[10];
+
+        while (i < 10)
         {
-            score += scoreToAdd; // Adds to current score
-            scoreText.text = "Score: " + score; // Updates the score display
-            MainManager2.Instance.playerScore = score; // set the playerScore to the new current score
+            // Parse existing score at this slot (odd index)
+            if (!int.TryParse(scoreTable[i], out oldScore))
+                oldScore = 0;
+
+            // If new score is higher, insert (and push the old pair down)
+            if (currentScore > oldScore)
+            {
+                oldUser = scoreTable[i - 1];             // save old user
+                scoreTable[i - 1] = currentUser;          // write new user
+                scoreTable[i]     = currentScore.ToString(); // write new score
+
+                // Shift for next iteration (bubble down)
+                currentScore = oldScore;
+                currentUser  = oldUser;
+            }
+
+            i += 2; // next (name,score) pair
         }
     }
-    private void ResetScore()
+
+    // ------------  SAVE DATA MODEL  ------------
+    [System.Serializable]
+    public class SaveData
     {
-        score = 0; // Sets the score back to 0
-        scoreText.text = "Score: " + score; // Updates the display
+        public string userName;
+        public string[] scoreTable;
     }
 
-
-    // ------------  SCORE SETTING  --------------
-
-   private void SetHighScore()
+    // ------------  SAVE / LOAD  ------------
+    public void SaveGame()
     {
-        if(score > MainManager2.Instance.playerHighScore) // If the current score is more than the last saved high score...
+        // Ensure table isn't null
+        if (scoreTable == null || scoreTable.Length != 10)
+            scoreTable = new string[10];
+
+        SaveData data = new SaveData
         {
+            userName = userName,
+            scoreTable = scoreTable
+        };
 
-            highScore = score; // Set the high score to the current score
-            highScoreName = MainManager2.Instance.playerName; // Set the high score name to the player's current name
+        string json = JsonUtility.ToJson(data);
+        string path = Path.Combine(Application.persistentDataPath, "savefile.json");
+        File.WriteAllText(path, json);
+        // Debug.Log($"Saved to {path}");
+    }
 
+    public void LoadGame()
+    {
+        string path = Path.Combine(Application.persistentDataPath, "savefile.json");
 
-            if(MainManager2.Instance.playerName != MainManager2.Instance.playerHighScoreName) // If the current name isn't the same as the last saved name...
-            {
-                // Set the saved name to be the same as the current name
-                MainManager2.Instance.playerHighScoreName = MainManager2.Instance.playerName;
-            }
+        if (File.Exists(path))
+        {
+            string json = File.ReadAllText(path);
+            SaveData data = JsonUtility.FromJson<SaveData>(json);
 
-            if (MainManager2.Instance.playerScore >= MainManager2.Instance.playerHighScore) // If the current score is higher or the same as the saved high score...
-            {
-                // Set the saved high score to the highScore
-                MainManager2.Instance.playerHighScore = highScore;
-            }
-
-            // Update the high score display
-            highScoreText.text = "Best score: " + MainManager2.Instance.playerHighScoreName + ": " + MainManager2.Instance.playerHighScore;
-
+            userName = data.userName;
+            scoreTable = (data.scoreTable != null && data.scoreTable.Length == 10)
+                ? data.scoreTable
+                : new string[10];
+        }
+        else
+        {
+            // First run: initialize defaults
+            userName = string.IsNullOrEmpty(userName) ? "Player" : userName;
+            scoreTable = new string[10];
         }
     }
 }

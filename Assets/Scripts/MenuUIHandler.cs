@@ -15,31 +15,46 @@ using UnityEditor;
 [DefaultExecutionOrder(1000)]
 public class MenuUIHandler : MonoBehaviour
 {
-    public string inputName;
-    public TMP_InputField inputField;
+    public Text userName;
+    public InputField inputName;
+    public Text HighScore;
 
-
-    public void ReadStringInput(string s) // This turns whatever's written in the InputField into a string
+    void Start()
     {
-        string inputName = inputField.text;
-        MainManager2.Instance.playerName = inputName; //sets playerName to the string
+        //userName.text = PlayerPrefs.GetString("user_name");
+        userName.text = GameManager.userName;
+        HighScore.text = $"{GameManager.scoreTable[0]}: {GameManager.scoreTable[1]}";   
     }
 
+    public void UpdateName()
+    {
+        //PlayerPrefs.SetString("user_name", userName.text);
 
+        userName.text = inputName.text;
+        // Debug.Log("value changed");
+        Debug.Log(userName.text);
+        GameManager.userName = userName.text;
+        Debug.Log(GameManager.userName);
 
-    // ----------- START & EXIT ----------
-    public void StartNew() // Loads the next Scene
+    }
+    // START AND EXIT GAME
+    public void StartGame()
     {
         SceneManager.LoadScene(1);
     }
 
-    public void Exit() // Quits the game
+    public void Exit()
     {
-#if UNITY_EDITOR
+        // GameManager.Instance.SaveScore();
+        GameManager.Instance.SaveGame();
+
+    #if UNITY_EDITOR
         EditorApplication.ExitPlaymode();
-#else
+    #else
         Application.Quit();
-#endif
+    #endif
     }
+    
+
 
 }
